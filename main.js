@@ -6,6 +6,24 @@
   const fileBtns = document.querySelectorAll(".file-btn");
   const fileCats = document.querySelectorAll(".file-cat");
   const logoCat = document.getElementById("logoCat");
+  const bgm = document.getElementById("bgm");
+  if (bgm) bgm.volume = 0.45;
+
+  function playBgm() {
+    if (!bgm) return;
+    const p = bgm.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  }
+  function pauseBgm() { if (bgm) bgm.pause(); }
+
+  // Browsers block autoplay until first user gesture — start bgm on first interaction
+  // if we're still on the home screen at that point.
+  const onFirstGesture = () => {
+    if (body.classList.contains("home-mode")) playBgm();
+  };
+  ["pointerdown", "keydown", "touchstart"].forEach(ev =>
+    document.addEventListener(ev, onFirstGesture, { once: true, passive: true, capture: true })
+  );
 
   const camOverlay = document.getElementById("camOverlay");
   const camStartBtn = document.getElementById("camStartBtn");
@@ -36,6 +54,7 @@
     body.classList.toggle("fullscreen-game", FULLSCREEN_GAMES.has(name));
     cards.forEach(c => c.classList.toggle("hidden", c.dataset.card !== name));
     buttons.forEach(b => b.classList.toggle("active", b.dataset.cat === name));
+    pauseBgm();
     stopAll();
     requestAnimationFrame(() => { stoppers[name] = starters[name](); });
   }
@@ -91,6 +110,7 @@
     body.classList.add("home-mode");
     body.classList.remove("fullscreen-game");
     paintHomeCats();
+    playBgm();
   }
 
   function paintHomeCats() {
@@ -123,4 +143,5 @@
   });
 
   paintHomeCats();
+  playBgm();
 })();
