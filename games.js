@@ -110,10 +110,8 @@ function setScore(barId, pct) {
   if (el) el.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
-// Pre-load the two black-cat photos used by the fullscreen game.
-const BLACK1_IMG = new Image();
+// Pre-load the caught-cat reveal photo for the black-cat game.
 const BLACK2_IMG = new Image();
-BLACK1_IMG.src = "public/black1.png";
 BLACK2_IMG.src = "public/black2.png";
 
 // Tuxedo cat photos — cat4 = base (messy), cat5 = tidy/groomed
@@ -177,8 +175,7 @@ function startBlackCatGame() {
   function drawCatPhoto(img, cx, cy, alpha, scaleMul) {
     if (!img.naturalWidth || alpha <= 0) return;
     const ar = img.naturalWidth / img.naturalHeight;
-    // fit cat to ~52% of the smaller screen dimension
-    const target = Math.min(w, h) * 0.52 * scaleMul;
+    const target = Math.min(w, h) * 0.6 * scaleMul;
     let drawW, drawH;
     if (ar >= 1) { drawW = target; drawH = target / ar; }
     else         { drawH = target; drawW = target * ar; }
@@ -187,6 +184,20 @@ function startBlackCatGame() {
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, x, y, drawW, drawH);
     ctx.globalAlpha = 1;
+  }
+
+  function drawWanderingEyes(cx, cy, blink) {
+    const s = Math.max(6, Math.min(w, h) * 0.012);
+    const gap = s * 2.4;
+    const ry = s * (1 - blink);
+    if (ry < 0.5) return;
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 230, 120, 0.95)";
+    ctx.shadowColor = "rgba(255, 220, 90, 0.85)";
+    ctx.shadowBlur = s * 2.4;
+    ctx.beginPath(); ctx.ellipse(cx - gap, cy, s, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + gap, cy, s, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   function drawHandCursor() {
@@ -210,17 +221,15 @@ function startBlackCatGame() {
     const dt = Math.min(0.05, (now - state.last) / 1000);
     state.last = now;
 
-    // cat drift: only wanders while not caught
+    // eyes wander (cat target drift); freeze in place while caught
     if (!state.caught) {
       if (now > state.cat.retargetAt) pickTarget();
       const dx = state.cat.tx - state.cat.x;
       const dy = state.cat.ty - state.cat.y;
-      // ease toward target, then flee if hand is close
       let speed = 1.6;
       if (handPos) {
         const hd = Math.hypot(handPos.x - state.cat.x, handPos.y - state.cat.y);
         if (hd < Math.min(w, h) * 0.22) {
-          // dart away from the hand
           const ax = state.cat.x - handPos.x, ay = state.cat.y - handPos.y;
           const am = Math.hypot(ax, ay) || 1;
           state.cat.tx = Math.max(40, Math.min(w - 40, state.cat.x + ax / am * 220));
@@ -233,16 +242,16 @@ function startBlackCatGame() {
       state.cat.y += dy * Math.min(1, dt * speed);
     }
 
-    // blink schedule — briefly cross-fade to black2 to fake an eye blink
+    // blink schedule
     if (!state.caught && now > state.nextBlinkAt) {
       state.blink = 1;
-      state.nextBlinkAt = now + 2200 + Math.random() * 2600;
+      state.nextBlinkAt = now + 1800 + Math.random() * 2400;
     }
-    state.blink = Math.max(0, state.blink - dt * 5);
+    state.blink = Math.max(0, state.blink - dt * 6);
 
-    // catch detection: fist while hand overlaps the cat
+    // catch: fist over the eyes
     if (!state.caught && isFist && handPos) {
-      const catR = Math.min(w, h) * 0.18;
+      const catR = Math.min(w, h) * 0.16;
       if (Math.hypot(handPos.x - state.cat.x, handPos.y - state.cat.y) < catR) {
         state.caught = true;
         state.caughtUntil = now + 1800;
@@ -254,13 +263,13 @@ function startBlackCatGame() {
     }
     if (state.caught && now > state.caughtUntil) {
       state.caught = false;
-      hint.textContent = "✋ 다시 어둠 속을 살펴봐요";
+      hint.textContent = "✋ 다시 어둠 속의 눈을 찾아봐요";
       placeNow();
     }
 
-    // smooth catch transition (locks on black2 while caught)
-    const targetCatch = state.caught ? 1 : 0;
-    state.catchAmt += (targetCatch - state.catchAmt) * Math.min(1, dt * 9);
+    // smooth reveal: photo only appears while caught
+    const targetReveal = state.caught ? 1 : 0;
+    state.catchAmt += (targetReveal - state.catchAmt) * Math.min(1, dt * 9);
     state.flash = Math.max(0, state.flash - dt * 2.2);
     state.kick  = Math.max(0, state.kick - dt * 3);
 
@@ -268,17 +277,20 @@ function startBlackCatGame() {
     ctx.fillStyle = "#06060a";
     ctx.fillRect(0, 0, w, h);
 
-    // composite: black1 always on, black2 alpha = max(catch, blink)
-    const blackTwoAmt = Math.max(state.catchAmt, state.blink);
-    const kickScale = 1 + state.kick * 0.06;
-    drawCatPhoto(BLACK1_IMG, state.cat.x, state.cat.y, 1, 1);
-    drawCatPhoto(BLACK2_IMG, state.cat.x, state.cat.y, blackTwoAmt,
-                 1 + (kickScale - 1) * state.catchAmt);
+    if (state.catchAmt > 0.01) {
+      // caught reveal — show black2 photo with kick
+      const kickScale = 1 + state.kick * 0.08;
+      drawCatPhoto(BLACK2_IMG, state.cat.x, state.cat.y, state.catchAmt, kickScale);
+    }
+    if (state.catchAmt < 0.99) {
+      // wandering eyes only — no flashlight, no cat body
+      drawWanderingEyes(state.cat.x, state.cat.y, state.blink);
+    }
 
     drawHandCursor();
 
     if (state.flash > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${state.flash * 0.35})`;
+      ctx.fillStyle = `rgba(255,255,255,${state.flash * 0.4})`;
       ctx.fillRect(0, 0, w, h);
     }
 
