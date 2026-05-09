@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>고양이 인터랙티브 도감</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="logo">CAT-O-PEDIA<span class="dot">.</span></h1>
+    <p class="subtitle">털 색깔로 만나는 인터랙티브 고양이 도감</p>
+  </header>
+
+  <nav class="cat-nav" id="catNav">
+    <button class="nav-btn active" data-cat="black">
+      <span class="nav-swatch" style="background:#111"></span>
+      <span class="nav-label">검은 고양이</span>
+    </button>
+    <button class="nav-btn" data-cat="cheese">
+      <span class="nav-swatch" style="background:#f4a93b"></span>
+      <span class="nav-label">치즈 고양이</span>
+    </button>
+    <button class="nav-btn" data-cat="tuxedo">
+      <span class="nav-swatch" style="background:linear-gradient(180deg,#111 50%,#f4f1e8 50%)"></span>
+      <span class="nav-label">턱시도 고양이</span>
+    </button>
+  </nav>
+
+  <main class="stage">
+    <section class="card" data-card="black">
+      <div class="card-info">
+        <span class="tag">no.01 — 깜냥이</span>
+        <h2>어둠 속의 눈동자</h2>
+        <p class="metaphor">디자인 메타포 · 보호색과 은폐</p>
+        <p class="experience">핵심 게임 경험 · 어둠 속에서 사라지는 고양이를 찾는 관찰력 게임</p>
+        <p class="howto">화면이 어두워지면 고양이가 사라져요. 깜빡이는 노란 눈동자와 작은 울음을 단서로 위치를 찾아 클릭해 보세요.</p>
+        <div class="meter"><span>발견</span><div class="bar"><i id="blackScore"></i></div></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="blackCanvas"></canvas>
+        <div class="hint" id="blackHint">화면을 클릭해 고양이를 깨워요</div>
+      </div>
+    </section>
+
+    <section class="card hidden" data-card="cheese">
+      <div class="card-info">
+        <span class="tag">no.02 — 치즈</span>
+        <h2>쭉쭉 늘어나는 치즈</h2>
+        <p class="metaphor">디자인 메타포 · 유연성과 에너지</p>
+        <p class="experience">핵심 게임 경험 · 고무줄처럼 늘어나는 몸을 제어하는 반사 신경 게임</p>
+        <p class="howto">치즈가 마음대로 늘어나려고 해요. 고양이를 잡고 끌어당겼다가 놓으면 통통 튕겨 돌아옵니다. 너무 멀리 가지 않게 막아주세요.</p>
+        <div class="meter"><span>안정</span><div class="bar"><i id="cheeseScore"></i></div></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="cheeseCanvas"></canvas>
+        <div class="hint" id="cheeseHint">고양이를 드래그해서 튕겨 보내요</div>
+      </div>
+    </section>
+
+    <section class="card hidden" data-card="tuxedo">
+      <div class="card-info">
+        <span class="tag">no.03 — 턱시도</span>
+        <h2>신사의 품격 유지하기</h2>
+        <p class="metaphor">디자인 메타포 · 의인화와 정돈</p>
+        <p class="experience">핵심 게임 경험 · 흐트러지는 품격을 유지하는 정교한 조작 게임</p>
+        <p class="howto">우다다가 시작되면 셔츠와 타이가 흐트러져요. 빠르게 스와이프해서 매무새를 다시 단정하게 정리해 주세요.</p>
+        <div class="meter"><span>품격</span><div class="bar"><i id="tuxedoScore"></i></div></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="tuxedoCanvas"></canvas>
+        <div class="hint" id="tuxedoHint">흐트러진 부분을 스와이프해 정리해요</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footbar">
+    <span>pixel · interactive · vanilla canvas</span>
+  </footer>
+
+  <script src="games.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
