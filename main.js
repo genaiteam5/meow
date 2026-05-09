@@ -31,7 +31,7 @@
   const camError = document.getElementById("camError");
   const fsBack = document.getElementById("fsBack");
 
-  const FULLSCREEN_GAMES = new Set(["black", "cheese"]);
+  const FULLSCREEN_GAMES = new Set(["black", "cheese", "tuxedo", "calico"]);
 
   const starters = {
     black:  () => window.CatGames.startBlackCatGame(),

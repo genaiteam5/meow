@@ -128,70 +128,179 @@ function startBlackCatGame() {
   window.addEventListener("resize", onResize);
 
   const state = {
-    fistAmt: 0,    // 0 = black1, 1 = black2 (smoothly animated)
-    wasFist: false,
-    flash: 0,      // brief white flash on grab transition
-    kick: 0,       // brief scale kick on grab transition
+    cat: { x: 0, y: 0, tx: 0, ty: 0, retargetAt: 0 },
+    fistAmt: 0,            // 0 = black1, 1 = black2 (smoothly animated)
+    caught: false,         // locked into black2 once caught
+    caughtUntil: 0,        // auto-release time
+    flash: 0,
+    kick: 0,
+    blink: 0,              // 0 = open eyes, 1 = closed
+    nextBlinkAt: 0,
+    eyeOffset: 0,          // small left/right glance
+    eyeDir: 1,
     raf: 0,
     last: performance.now(),
   };
 
+  let handPos = null;
   let isFist = false;
   const unsubscribe = window.HandTracker.subscribe(data => {
-    isFist = data.hands.length > 0 && data.hands[0].isFist;
+    if (data.hands.length > 0) {
+      const h0 = data.hands[0];
+      handPos = { x: h0.palm.x * w, y: h0.palm.y * h };
+      isFist = h0.isFist;
+    } else {
+      handPos = null;
+      isFist = false;
+    }
   });
 
-  function drawCover(img, alpha, scale) {
-    if (!img.naturalWidth) return;
+  function pickTarget() {
+    const m = Math.min(w, h) * 0.18;
+    state.cat.tx = m + Math.random() * Math.max(1, w - m * 2);
+    state.cat.ty = m + Math.random() * Math.max(1, h - m * 2);
+    state.cat.retargetAt = performance.now() + 2200 + Math.random() * 2200;
+  }
+  function placeNow() {
+    pickTarget();
+    state.cat.x = state.cat.tx;
+    state.cat.y = state.cat.ty;
+    state.cat.retargetAt = performance.now() + 1800 + Math.random() * 2000;
+  }
+  placeNow();
+  state.nextBlinkAt = performance.now() + 800 + Math.random() * 1600;
+
+  function drawCatPhoto(img, cx, cy, alpha, scaleMul) {
+    if (!img.naturalWidth) return null;
     const ar = img.naturalWidth / img.naturalHeight;
-    const screenAr = w / h;
+    // fit cat to ~52% of the smaller screen dimension
+    const target = Math.min(w, h) * 0.52 * scaleMul;
     let drawW, drawH;
-    // fit to screen while preserving aspect (contain — show full image)
-    if (ar > screenAr) {
-      drawW = w * scale;
-      drawH = (w / ar) * scale;
-    } else {
-      drawH = h * scale;
-      drawW = (h * ar) * scale;
-    }
-    const x = (w - drawW) / 2;
-    const y = (h - drawH) / 2;
+    if (ar >= 1) { drawW = target; drawH = target / ar; }
+    else         { drawH = target; drawW = target * ar; }
+    const x = cx - drawW / 2;
+    const y = cy - drawH / 2;
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, x, y, drawW, drawH);
     ctx.globalAlpha = 1;
+    return { x, y, w: drawW, h: drawH };
   }
 
-  hint.textContent = "✋ 손을 펴 보고, 주먹을 쥐면 잡혀요";
+  function drawEyes(box) {
+    if (!box) return;
+    // approximate eye position on the cat photo (upper-center face area)
+    const eyeY = box.y + box.h * 0.34;
+    const eyeGap = box.w * 0.13;
+    const cxL = box.x + box.w * 0.5 - eyeGap + state.eyeOffset;
+    const cxR = box.x + box.w * 0.5 + eyeGap + state.eyeOffset;
+    const rx  = Math.max(3, box.w * 0.028);
+    const ry  = Math.max(2, box.h * 0.022) * (1 - state.blink);
+
+    // soft yellow glow
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 230, 120, 0.85)";
+    ctx.shadowColor = "rgba(255, 220, 90, 0.9)";
+    ctx.shadowBlur = Math.max(6, box.w * 0.04);
+    if (ry > 0.4) {
+      ctx.beginPath(); ctx.ellipse(cxL, eyeY, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cxR, eyeY, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawHandCursor() {
+    if (!handPos) return;
+    ctx.save();
+    ctx.strokeStyle = isFist ? "rgba(255, 220, 90, 0.95)" : "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(handPos.x, handPos.y, isFist ? 22 : 30, 0, Math.PI * 2);
+    ctx.stroke();
+    if (isFist) {
+      ctx.fillStyle = "rgba(255, 220, 90, 0.18)";
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  hint.textContent = "✋ 어둠 속 노란 눈을 따라가서 ✊ 주먹으로 잡아요";
 
   function loop(now) {
     const dt = Math.min(0.05, (now - state.last) / 1000);
     state.last = now;
 
-    // edge: just became a fist → trigger flash + kick
-    if (isFist && !state.wasFist) {
-      state.flash = 1;
-      state.kick = 1;
-      hint.textContent = "✊ 잡았다!";
-    } else if (!isFist && state.wasFist) {
-      hint.textContent = "✋ 손을 펴면 다시 보여요";
+    // cat drift: only wanders while not caught
+    if (!state.caught) {
+      if (now > state.cat.retargetAt) pickTarget();
+      const dx = state.cat.tx - state.cat.x;
+      const dy = state.cat.ty - state.cat.y;
+      // ease toward target, then flee if hand is close
+      let speed = 1.6;
+      if (handPos) {
+        const hd = Math.hypot(handPos.x - state.cat.x, handPos.y - state.cat.y);
+        if (hd < Math.min(w, h) * 0.22) {
+          // dart away from the hand
+          const ax = state.cat.x - handPos.x, ay = state.cat.y - handPos.y;
+          const am = Math.hypot(ax, ay) || 1;
+          state.cat.tx = Math.max(40, Math.min(w - 40, state.cat.x + ax / am * 220));
+          state.cat.ty = Math.max(40, Math.min(h - 40, state.cat.y + ay / am * 220));
+          state.cat.retargetAt = now + 1400;
+          speed = 5.5;
+        }
+      }
+      state.cat.x += dx * Math.min(1, dt * speed);
+      state.cat.y += dy * Math.min(1, dt * speed);
     }
-    state.wasFist = isFist;
 
-    // smooth animations
-    const target = isFist ? 1 : 0;
-    state.fistAmt += (target - state.fistAmt) * Math.min(1, dt * 8);
+    // blink schedule
+    if (now > state.nextBlinkAt) {
+      state.blink = 1;
+      state.nextBlinkAt = now + 1100 + Math.random() * 2200;
+    }
+    state.blink = Math.max(0, state.blink - dt * 6); // close→open quickly
+    // small horizontal eye glance, sinusoidal
+    state.eyeOffset = Math.sin(now / 600) * Math.max(2, Math.min(w, h) * 0.004);
+
+    // catch detection: fist while hand overlaps the cat
+    if (!state.caught && isFist && handPos) {
+      const catR = Math.min(w, h) * 0.18;
+      if (Math.hypot(handPos.x - state.cat.x, handPos.y - state.cat.y) < catR) {
+        state.caught = true;
+        state.caughtUntil = now + 1800;
+        state.flash = 1;
+        state.kick = 1;
+        hint.textContent = "✊ 잡았다!";
+      }
+    }
+    if (state.caught && now > state.caughtUntil) {
+      state.caught = false;
+      hint.textContent = "✋ 다시 어둠 속을 살펴봐요";
+      placeNow();
+    }
+
+    // smooth photo cross-fade
+    const target = state.caught ? 1 : 0;
+    state.fistAmt += (target - state.fistAmt) * Math.min(1, dt * 9);
     state.flash = Math.max(0, state.flash - dt * 2.2);
     state.kick  = Math.max(0, state.kick - dt * 3);
 
-    // black backdrop so transparent edges look intentional
+    // dark backdrop
     ctx.fillStyle = "#06060a";
     ctx.fillRect(0, 0, w, h);
 
-    // cross-fade between the two photos. tiny zoom-in on the "caught" image
-    // sells the grab moment without hiding the picture.
-    const baseScale = 1 + state.kick * 0.04;
-    drawCover(BLACK1_IMG, 1 - state.fistAmt, 1);
-    drawCover(BLACK2_IMG, state.fistAmt, baseScale);
+    // draw active photo at the cat's current position
+    const kickScale = 1 + state.kick * 0.06;
+    const box = state.fistAmt < 0.5
+      ? drawCatPhoto(BLACK1_IMG, state.cat.x, state.cat.y, 1 - state.fistAmt, 1)
+      : drawCatPhoto(BLACK2_IMG, state.cat.x, state.cat.y, state.fistAmt, kickScale);
+    if (state.fistAmt > 0 && state.fistAmt < 1) {
+      drawCatPhoto(state.fistAmt < 0.5 ? BLACK2_IMG : BLACK1_IMG,
+                   state.cat.x, state.cat.y,
+                   state.fistAmt < 0.5 ? state.fistAmt : 1 - state.fistAmt, 1);
+    }
+    if (!state.caught) drawEyes(box);
+
+    drawHandCursor();
 
     if (state.flash > 0) {
       ctx.fillStyle = `rgba(255,255,255,${state.flash * 0.35})`;
