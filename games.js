@@ -187,17 +187,38 @@ function startBlackCatGame() {
   }
 
   function drawWanderingEyes(cx, cy, blink) {
-    const s = Math.max(6, Math.min(w, h) * 0.012);
-    const gap = s * 2.4;
-    const ry = s * (1 - blink);
-    if (ry < 0.5) return;
-    ctx.save();
-    ctx.fillStyle = "rgba(255, 230, 120, 0.95)";
-    ctx.shadowColor = "rgba(255, 220, 90, 0.85)";
-    ctx.shadowBlur = s * 2.4;
-    ctx.beginPath(); ctx.ellipse(cx - gap, cy, s, ry, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + gap, cy, s, ry, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    // pixel-style cat eyes: white sclera with black pupil, blink collapses height
+    const px = Math.max(2, Math.round(Math.min(w, h) / 180));
+    const eyeW = px * 6;
+    const eyeH = px * 6;
+    const gap  = px * 5;
+    const open = Math.max(0, 1 - blink);
+    const halfH = Math.max(px * 0.5, (eyeH / 2) * open);
+
+    function drawOne(ex) {
+      const x = Math.round(ex - eyeW / 2);
+      const yTop = Math.round(cy - halfH);
+      const h2 = Math.round(halfH * 2);
+      // black outline (slightly larger)
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(x - px, yTop - px, eyeW + px * 2, h2 + px * 2);
+      // white sclera
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x, yTop, eyeW, h2);
+      // black pupil — vertical slit, scales with openness
+      if (open > 0.25) {
+        const pw = Math.max(px, Math.round(eyeW * 0.32));
+        const ph = Math.max(px, Math.round(h2 * 0.7));
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(
+          Math.round(ex - pw / 2),
+          Math.round(cy - ph / 2),
+          pw, ph
+        );
+      }
+    }
+    drawOne(cx - gap);
+    drawOne(cx + gap);
   }
 
   function drawHandCursor() {
@@ -441,172 +462,229 @@ function startCheeseCatGame() {
 }
 
 // ============================================================
-// 3. TUXEDO CAT — pinch to gather scattered chest fur
+// 3. TUXEDO CAT — pinch the open chest fur to gather it tidy
+//
+// Idle: cat4.png shown; the white chest fur is rendered as a wide,
+//   ragged opening that slowly drifts wider over time.
+// Active: thumb+index pinch (MediaPipe landmarks 4 & 8) inside the
+//   fur area continuously narrows the opening.
+// Success: opening narrow enough → cat5.png reveal + heart particles
+//   + "단정!" pixel text. Holds briefly then resets.
 // ============================================================
 function startTuxedoCatGame() {
   const canvas = document.getElementById("tuxedoCanvas");
   const hint = document.getElementById("tuxedoHint");
   let { ctx, w, h } = fitCanvas(canvas);
-  const onResize = () => { const r = fitCanvas(canvas); ctx = r.ctx; w = r.w; h = r.h; layoutPieces(); };
+  const onResize = () => { const r = fitCanvas(canvas); ctx = r.ctx; w = r.w; h = r.h; };
   window.addEventListener("resize", onResize);
 
   const state = {
-    pieces: [],
-    grace: 100,
+    openness: 0.85,        // 0 = tidy, 1 = fully open
+    success: false,
+    successUntil: 0,
+    hearts: [],
     raf: 0,
     last: performance.now(),
-    chaosTimer: 0,
   };
-  let pinchPos = null, pinching = false, grabbed = null;
-
-  function layoutPieces() {
-    const cx = w / 2, cy = h / 2 + 10;
-    const baseScale = Math.max(3, Math.min(w, h) / 70);
-    const px = 11 * baseScale;
-    const positions = [
-      { x: cx - px*1.2, y: cy + px*0.2 },
-      { x: cx - px*0.6, y: cy + px*0.9 },
-      { x: cx,          y: cy + px*1.3 },
-      { x: cx + px*0.6, y: cy + px*0.9 },
-      { x: cx + px*1.2, y: cy + px*0.2 },
-    ];
-    state.pieces = positions.map(p => ({
-      x: p.x, y: p.y,
-      vx: 0, vy: 0,
-      home: { x: p.x, y: p.y },
-      size: 14,
-    }));
-  }
-  layoutPieces();
+  let pinchPos = null, pinching = false, pinchDist = 1;
 
   const unsubscribe = window.HandTracker.subscribe(data => {
     if (data.hands.length > 0) {
       const h0 = data.hands[0];
-      pinchPos = {
-        x: ((h0.thumbTip.x + h0.indexTip.x) / 2) * w,
-        y: ((h0.thumbTip.y + h0.indexTip.y) / 2) * h,
-      };
-      const wasPinching = pinching;
+      const tx = h0.thumbTip.x * w, ty = h0.thumbTip.y * h;
+      const ix = h0.indexTip.x * w, iy = h0.indexTip.y * h;
+      pinchPos = { x: (tx + ix) / 2, y: (ty + iy) / 2 };
+      pinchDist = Math.hypot(tx - ix, ty - iy);
       pinching = h0.isPinch;
-
-      if (pinching && !wasPinching) {
-        let near = null, best = 70;
-        for (const p of state.pieces) {
-          const d = Math.hypot(p.x - pinchPos.x, p.y - pinchPos.y);
-          if (d < best) { best = d; near = p; }
-        }
-        grabbed = near;
-        if (grabbed) hint.textContent = "잡았다! 가슴 중앙으로 옮겨주세요";
-      } else if (!pinching && wasPinching && grabbed) {
-        const d = Math.hypot(grabbed.x - grabbed.home.x, grabbed.y - grabbed.home.y);
-        if (d < 30) {
-          grabbed.x = grabbed.home.x;
-          grabbed.y = grabbed.home.y;
-          grabbed.vx = grabbed.vy = 0;
-          state.grace += 5;
-          hint.textContent = "단정하게 놓였어요";
-        } else {
-          grabbed.vx = (Math.random() - 0.5) * 60;
-          grabbed.vy = (Math.random() - 0.5) * 60;
-          hint.textContent = "흠… 다시 시도해보세요";
-        }
-        grabbed = null;
-      }
     } else {
       pinchPos = null;
       pinching = false;
-      grabbed = null;
     }
   });
+
+  // chest fur geometry (as a ratio of cat photo bounds)
+  function furBounds() {
+    const target = Math.min(w, h) * 0.7;
+    // cat photo is 'contain'-fit ~70% of min dim, centered at (cx, cy)
+    const cx = w / 2;
+    const cy = h * 0.55;
+    return {
+      cx,
+      // chest sits in the lower middle of the cat
+      cyTop:    cy + target * 0.05,
+      cyBot:    cy + target * 0.36,
+      maxHalfW: target * 0.28,    // fully open
+      minHalfW: target * 0.07,    // tidy
+    };
+  }
+
+  function pinchInsideFur(b) {
+    if (!pinchPos) return false;
+    if (pinchPos.y < b.cyTop - 20 || pinchPos.y > b.cyBot + 20) return false;
+    const halfW = b.maxHalfW * state.openness + 20;
+    return Math.abs(pinchPos.x - b.cx) < halfW;
+  }
+
+  function drawFurOpening(b) {
+    // ragged white wedge: top wide, narrows toward bottom — width scales with openness
+    const halfW = b.maxHalfW * state.openness + b.minHalfW * (1 - state.openness);
+    const px = Math.max(2, Math.round(Math.min(w, h) / 220));  // pixel chunk size
+    ctx.fillStyle = "#fbf8ee";
+    const rows = Math.floor((b.cyBot - b.cyTop) / px);
+    for (let r = 0; r <= rows; r++) {
+      const y = b.cyTop + r * px;
+      const t = r / rows;
+      // tapers from full halfW at top to ~30% at bottom
+      const taper = 1 - t * 0.65;
+      // ragged left/right edge — deterministic jitter so it doesn't shimmer
+      const jitterL = ((r * 73) % 5) * px - 2 * px;
+      const jitterR = ((r * 91) % 5) * px - 2 * px;
+      const left  = b.cx - halfW * taper + jitterL * (state.openness * 0.7 + 0.3);
+      const right = b.cx + halfW * taper + jitterR * (state.openness * 0.7 + 0.3);
+      ctx.fillRect(Math.round(left), Math.round(y), Math.max(px, Math.round(right - left)), px);
+    }
+    // dark outline edges to make the "rip" read as cat fur
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    for (let r = 0; r <= rows; r += 2) {
+      const y = b.cyTop + r * px;
+      const t = r / rows;
+      const taper = 1 - t * 0.65;
+      const jitterL = ((r * 73) % 5) * px - 2 * px;
+      const jitterR = ((r * 91) % 5) * px - 2 * px;
+      const left  = b.cx - halfW * taper + jitterL * (state.openness * 0.7 + 0.3);
+      const right = b.cx + halfW * taper + jitterR * (state.openness * 0.7 + 0.3);
+      ctx.fillRect(Math.round(left - px), Math.round(y), px, px);
+      ctx.fillRect(Math.round(right),     Math.round(y), px, px);
+    }
+  }
+
+  function spawnHearts(now) {
+    if (state.hearts.length > 60) return;
+    if (Math.random() < 0.35) {
+      const b = furBounds();
+      state.hearts.push({
+        x: b.cx + (Math.random() - 0.5) * b.maxHalfW * 1.2,
+        y: b.cyTop + Math.random() * (b.cyBot - b.cyTop),
+        vy: -40 - Math.random() * 50,
+        vx: (Math.random() - 0.5) * 30,
+        life: 1.4,
+        size: 8 + Math.random() * 6,
+        born: now,
+      });
+    }
+  }
+
+  function drawHearts(dt) {
+    const px = Math.max(2, Math.round(Math.min(w, h) / 240));
+    for (let i = state.hearts.length - 1; i >= 0; i--) {
+      const p = state.hearts[i];
+      p.life -= dt;
+      if (p.life <= 0) { state.hearts.splice(i, 1); continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 12 * dt;
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 1.2));
+      ctx.fillStyle = "#e8556b";
+      // simple pixel heart
+      const s = px;
+      const cx = Math.round(p.x), cy = Math.round(p.y);
+      ctx.fillRect(cx - 2*s, cy - s,   2*s, s);
+      ctx.fillRect(cx,       cy - s,   2*s, s);
+      ctx.fillRect(cx - 3*s, cy,       6*s, s);
+      ctx.fillRect(cx - 2*s, cy + s,   4*s, s);
+      ctx.fillRect(cx - s,   cy + 2*s, 2*s, s);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawSuccessText(now) {
+    const t = Math.max(0, (state.successUntil - now) / 2500);
+    ctx.save();
+    const baseSize = Math.max(20, Math.min(w, h) / 18);
+    ctx.font = `${Math.round(baseSize)}px "Galmuri11", "Courier New", monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const x = w / 2;
+    const y = h * 0.22;
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillText("단정!", x + 3, y + 3);
+    ctx.fillStyle = "#fff8a8";
+    ctx.fillText("단정!", x, y);
+    // tiny sparkles
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const px = Math.max(2, Math.round(baseSize / 9));
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2 + (1 - t) * 4;
+      const r = baseSize * (1.2 + Math.sin((1 - t) * 6 + i) * 0.3);
+      ctx.fillRect(Math.round(x + Math.cos(ang) * r), Math.round(y + Math.sin(ang) * r), px, px);
+    }
+    ctx.restore();
+  }
+
+  function drawPinchCursor() {
+    if (!pinchPos) return;
+    ctx.save();
+    const closing = pinching;
+    ctx.strokeStyle = closing ? "#c0392b" : "rgba(40,40,40,0.85)";
+    ctx.fillStyle   = closing ? "rgba(192,57,43,0.22)" : "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(pinchPos.x, pinchPos.y, closing ? 12 : 22, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  hint.textContent = "✋ 엄지·검지를 흰 털 위에서 모아 여며주세요";
 
   function loop(now) {
     const dt = Math.min(0.05, (now - state.last) / 1000);
     state.last = now;
 
-    ctx.fillStyle = "#fbf8ee";
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = "rgba(20,20,20,0.05)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-    for (let y = 0; y < h; y += 24) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    drawPixelGrassBg(ctx, w, h);
 
-    state.chaosTimer -= dt;
-    if (state.chaosTimer <= 0) {
-      for (const p of state.pieces) {
-        if (p === grabbed) continue;
-        const ax = p.x - w / 2;
-        const ay = p.y - h / 2;
-        const len = Math.hypot(ax, ay) || 1;
-        const dirX = ax / len, dirY = ay / len;
-        p.vx += dirX * (60 + Math.random() * 80);
-        p.vy += dirY * (60 + Math.random() * 80) - 40;
-      }
-      state.chaosTimer = 1.4 + Math.random() * 1.2;
-      hint.textContent = "우다다! 셔츠가 흐트러져요";
+    // success state ends → reset to messy
+    if (state.success && now > state.successUntil) {
+      state.success = false;
+      state.openness = 0.85;
+      hint.textContent = "✋ 다시 흐트러졌어요. 여며주세요";
     }
 
-    const baseScale = Math.max(3, Math.min(w, h) / 70);
-    drawTuxedoPhoto(ctx, w, h, state.grace);
-
-    for (const p of state.pieces) {
-      if (p !== grabbed) {
-        p.vx *= 0.92; p.vy *= 0.92;
-        p.x += p.vx * dt; p.y += p.vy * dt;
-        if (p.x < 12) { p.x = 12; p.vx *= -0.5; }
-        if (p.x > w - 12) { p.x = w - 12; p.vx *= -0.5; }
-        if (p.y < 12) { p.y = 12; p.vy *= -0.5; }
-        if (p.y > h - 12) { p.y = h - 12; p.vy *= -0.5; }
-      } else if (pinchPos) {
-        p.x = pinchPos.x; p.y = pinchPos.y;
+    // openness dynamics
+    if (!state.success) {
+      const b = furBounds();
+      if (pinching && pinchInsideFur(b)) {
+        // tighter pinch (smaller thumb-index distance) → faster gathering
+        const tightness = Math.max(0, 1 - pinchDist / Math.max(40, Math.min(w, h) * 0.08));
+        state.openness -= dt * (0.55 + tightness * 0.65);
+        hint.textContent = "여미는 중…";
+      } else {
+        // gentle drift wider
+        state.openness += dt * 0.06;
       }
-
-      ctx.strokeStyle = "rgba(20,20,20,0.18)";
-      ctx.setLineDash([3, 3]);
-      ctx.lineWidth = 1;
-      ctx.strokeRect(p.home.x - p.size, p.home.y - p.size, p.size * 2, p.size * 2);
-      ctx.setLineDash([]);
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = "#fbf8ee";
-      ctx.strokeStyle = "#0a0a0a";
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(-p.size, -p.size, p.size * 2, p.size * 2);
-      ctx.strokeRect(-p.size, -p.size, p.size * 2, p.size * 2);
-      ctx.restore();
-
-      if (p === grabbed) {
-        ctx.strokeStyle = "#c0392b";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size + 8, 0, Math.PI * 2);
-        ctx.stroke();
+      state.openness = Math.max(0, Math.min(1, state.openness));
+      if (state.openness <= 0.18) {
+        state.success = true;
+        state.successUntil = now + 2500;
+        hint.textContent = "단정! ✨ 기분 좋아요";
       }
     }
 
-    let scatter = 0;
-    for (const p of state.pieces) {
-      scatter += Math.hypot(p.x - p.home.x, p.y - p.home.y);
-    }
-    const avg = scatter / state.pieces.length;
-    state.grace -= avg * dt * 0.18;
-    state.grace += (avg < 14 ? 1 : 0) * dt * 8;
-    state.grace = Math.max(0, Math.min(100, state.grace));
-    setScore("tuxedoScore", state.grace);
+    // cat photo: cat4 (drowsy) when messy, cat5 (eyes open) on success
+    drawTuxedoPhoto(ctx, w, h, state.success ? 100 : 0);
 
-    if (pinchPos) {
-      ctx.strokeStyle = pinching ? "#c0392b" : "#0a0a0a";
-      ctx.fillStyle = pinching ? "rgba(192,57,43,0.18)" : "rgba(10,10,10,0.06)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(pinchPos.x, pinchPos.y, pinching ? 10 : 22, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#0a0a0a";
-      ctx.font = "11px ui-monospace, monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(pinching ? "👌 핀치" : "✋ 손가락을 모으세요", pinchPos.x, pinchPos.y + 36);
+    // chest fur opening — hide on success (clean state)
+    if (!state.success) {
+      drawFurOpening(furBounds());
     }
+
+    if (state.success) {
+      spawnHearts(now);
+      drawSuccessText(now);
+    }
+    drawHearts(dt);
+
+    drawPinchCursor();
 
     state.raf = requestAnimationFrame(loop);
   }
@@ -617,6 +695,44 @@ function startTuxedoCatGame() {
     unsubscribe();
     window.removeEventListener("resize", onResize);
   };
+}
+
+function drawPixelGrassBg(ctx, w, h) {
+  const skyH = Math.round(h * 0.62);
+  // sky
+  const sky = ctx.createLinearGradient(0, 0, 0, skyH);
+  sky.addColorStop(0, "#4ea7d6");
+  sky.addColorStop(1, "#6ec0e0");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, skyH);
+
+  // grass strips (matches home-grass palette)
+  const g1H = Math.round((h - skyH) * 0.18);
+  const g2H = Math.round((h - skyH) * 0.20);
+  ctx.fillStyle = "#79b34a"; ctx.fillRect(0, skyH,            w, g1H);
+  ctx.fillStyle = "#6aa340"; ctx.fillRect(0, skyH + g1H,      w, g2H);
+  ctx.fillStyle = "#5e9637"; ctx.fillRect(0, skyH + g1H + g2H, w, h - skyH - g1H - g2H);
+
+  // pixel grass-blade tufts at the sky/grass boundary
+  ctx.fillStyle = "#79b34a";
+  const blade = Math.max(3, Math.round(Math.min(w, h) / 200));
+  for (let x = 0; x < w; x += blade * 6) {
+    const tuftH = blade * (2 + ((x / (blade * 6)) % 3));
+    ctx.fillRect(x,             skyH - tuftH,     blade,     tuftH);
+    ctx.fillRect(x + blade * 2, skyH - tuftH * 0.6, blade, tuftH * 0.6);
+  }
+
+  // a few pixel clouds in the sky
+  ctx.fillStyle = "#fffbe6";
+  const cloudY = Math.round(h * 0.12);
+  function cloud(cx) {
+    const u = blade;
+    ctx.fillRect(cx,         cloudY,         u * 6, u);
+    ctx.fillRect(cx - u,     cloudY + u,     u * 8, u);
+    ctx.fillRect(cx - u * 2, cloudY + u * 2, u * 10, u);
+  }
+  cloud(Math.round(w * 0.18));
+  cloud(Math.round(w * 0.72));
 }
 
 function drawTuxedoPhoto(ctx, w, h, grace) {
@@ -630,8 +746,9 @@ function drawTuxedoPhoto(ctx, w, h, grace) {
     let dw, dh;
     if (ar >= 1) { dw = target; dh = target / ar; }
     else         { dh = target; dw = target * ar; }
+    // sit on the grass: center horizontally, center vertically at h*0.55
     const x = (w - dw) / 2;
-    const y = (h - dh) / 2;
+    const y = h * 0.55 - dh / 2;
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, x, y, dw, dh);
     ctx.globalAlpha = 1;
