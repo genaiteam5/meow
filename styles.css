@@ -213,7 +213,7 @@ body.home-mode .footbar { display: none; }
 }
 .file-tip {
   position: absolute;
-  bottom: -22px; left: 50%;
+  bottom: -36px; left: 50%;
   transform: translateX(-50%);
   font-size: 13px;
   color: #fff;
@@ -224,6 +224,8 @@ body.home-mode .footbar { display: none; }
   transition: opacity 0.2s ease;
   white-space: nowrap;
   font-family: var(--pixel-font);
+  z-index: 4;
+  pointer-events: none;
 }
 
 .file-btn:hover .file-cat,

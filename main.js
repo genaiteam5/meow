@@ -14,13 +14,9 @@
     const p = bgm.play();
     if (p && typeof p.catch === "function") p.catch(() => {});
   }
-  function pauseBgm() { if (bgm) bgm.pause(); }
 
-  // Browsers block autoplay until first user gesture — start bgm on first interaction
-  // if we're still on the home screen at that point.
-  const onFirstGesture = () => {
-    if (body.classList.contains("home-mode")) playBgm();
-  };
+  // Browsers block autoplay until first user gesture — start bgm on first interaction.
+  const onFirstGesture = () => playBgm();
   ["pointerdown", "keydown", "touchstart"].forEach(ev =>
     document.addEventListener(ev, onFirstGesture, { once: true, passive: true, capture: true })
   );
@@ -54,7 +50,6 @@
     body.classList.toggle("fullscreen-game", FULLSCREEN_GAMES.has(name));
     cards.forEach(c => c.classList.toggle("hidden", c.dataset.card !== name));
     buttons.forEach(b => b.classList.toggle("active", b.dataset.cat === name));
-    pauseBgm();
     stopAll();
     requestAnimationFrame(() => { stoppers[name] = starters[name](); });
   }
