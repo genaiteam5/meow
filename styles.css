@@ -519,6 +519,10 @@ body.fullscreen-game .topbar,
 body.fullscreen-game .cat-nav,
 body.fullscreen-game .footbar { display: none; }
 
+/* keep inactive cards hidden in fullscreen — fullscreen `.card` rule below
+   would otherwise outweigh `.card.hidden` on specificity. */
+body.fullscreen-game .card.hidden { display: none; }
+
 body.fullscreen-game .stage {
   max-width: none;
   margin: 0;

@@ -110,217 +110,92 @@ function setScore(barId, pct) {
   if (el) el.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
-// Pre-load the optional cat1.png (used as a "real photo" in the catch reveal).
-const CAT1_IMG = new Image();
-CAT1_IMG.src = "public/cat1.png";
-let CAT1_LOADED = false;
-CAT1_IMG.addEventListener("load",  () => { CAT1_LOADED = true; });
-CAT1_IMG.addEventListener("error", () => { CAT1_LOADED = false; });
+// Pre-load the two black-cat photos used by the fullscreen game.
+const BLACK1_IMG = new Image();
+const BLACK2_IMG = new Image();
+BLACK1_IMG.src = "public/black1.png";
+BLACK2_IMG.src = "public/black2.png";
 
 // ============================================================
-// 1. BLACK CAT — full-screen darkness, only eyes blink → catch
-//    triggers a flashlight reveal that mimics the reference photo.
+// 1. BLACK CAT — black1.png fills the screen; making a fist
+//    cross-fades to black2.png with a soft flash + zoom kick.
 // ============================================================
 function startBlackCatGame() {
   const canvas = document.getElementById("blackCanvas");
   const hint = document.getElementById("blackHint");
   let { ctx, w, h } = fitCanvas(canvas);
-  const onResize = () => { const r = fitCanvas(canvas); ctx = r.ctx; w = r.w; h = r.h; placeCat(); };
+  const onResize = () => { const r = fitCanvas(canvas); ctx = r.ctx; w = r.w; h = r.h; };
   window.addEventListener("resize", onResize);
 
-  const SCALE = () => Math.max(3, Math.min(w, h) / 60);
-
   const state = {
-    cat: { x: 0, y: 0, eyeOffset: 0, eyeDir: 1 },
-    found: 0, total: 5,
-    blinkPhase: 0, nextBlink: 1.5,
-    moveAt: 0,
+    fistAmt: 0,    // 0 = black1, 1 = black2 (smoothly animated)
+    wasFist: false,
+    flash: 0,      // brief white flash on grab transition
+    kick: 0,       // brief scale kick on grab transition
     raf: 0,
     last: performance.now(),
-    fistCooldown: 0,
-    reveal: { active: false, t: 0, x: 0, y: 0 }, // catch reveal animation
   };
 
-  let handPos = null;
   let isFist = false;
-
-  function placeCat() {
-    const s = SCALE();
-    const cw = 24 * s, ch = 12 * s;
-    state.cat.x = Math.random() * Math.max(40, w - cw - 40) + 20;
-    state.cat.y = Math.random() * Math.max(40, h - ch - 40) + 20;
-    state.moveAt = performance.now() + 6000 + Math.random() * 4000;
-    state.nextBlink = 0.5 + Math.random() * 0.8;
-    state.cat.eyeOffset = 0;
-    state.cat.eyeDir = Math.random() < 0.5 ? -1 : 1;
-  }
-  placeCat();
-
   const unsubscribe = window.HandTracker.subscribe(data => {
-    if (data.hands.length > 0) {
-      const h0 = data.hands[0];
-      handPos = { x: h0.palm.x * w, y: h0.palm.y * h };
-      isFist = h0.isFist;
-    } else {
-      handPos = null;
-      isFist = false;
-    }
+    isFist = data.hands.length > 0 && data.hands[0].isFist;
   });
 
-  function drawDarkness() {
-    ctx.fillStyle = "#06060a";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(255,255,255,0.04)";
-    for (let i = 0; i < 36; i++) {
-      const sx = (i * 73) % w;
-      const sy = (i * 137) % h;
-      ctx.fillRect(sx, sy, 1.5, 1.5);
-    }
-  }
-
-  // The catch reveal: a bright circular flashlight grows over the cat,
-  // showing it large like the reference photo. Replicates cat1.png's vibe.
-  function drawReveal(now) {
-    const t = state.reveal.t;
-    const cx = state.reveal.x, cy = state.reveal.y;
-
-    drawDarkness();
-
-    // grow → hold → fade
-    let radius;
-    const grow = 0.3, hold = 1.4, fade = 0.4;
-    const peakRadius = Math.min(Math.min(w, h) * 0.42, 260);
-    if (t < grow) {
-      radius = peakRadius * (t / grow);
-    } else if (t < grow + hold) {
-      radius = peakRadius;
-    } else if (t < grow + hold + fade) {
-      const k = (t - grow - hold) / fade;
-      radius = peakRadius * (1 - k);
+  function drawCover(img, alpha, scale) {
+    if (!img.naturalWidth) return;
+    const ar = img.naturalWidth / img.naturalHeight;
+    const screenAr = w / h;
+    let drawW, drawH;
+    // fit to screen while preserving aspect (contain — show full image)
+    if (ar > screenAr) {
+      drawW = w * scale;
+      drawH = (w / ar) * scale;
     } else {
-      radius = 0;
+      drawH = h * scale;
+      drawW = (h * ar) * scale;
     }
-
-    if (radius > 1) {
-      // bright circular spotlight
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      grad.addColorStop(0,    "rgba(252, 248, 235, 0.98)");
-      grad.addColorStop(0.78, "rgba(252, 248, 235, 0.92)");
-      grad.addColorStop(1,    "rgba(252, 248, 235, 0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // illuminated cat — large, centered on reveal point
-      if (CAT1_LOADED) {
-        const ar = CAT1_IMG.naturalWidth / CAT1_IMG.naturalHeight;
-        const drawW = radius * 1.8;
-        const drawH = drawW / ar;
-        ctx.drawImage(CAT1_IMG, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
-      } else {
-        // fallback: pixel sprite enlarged
-        const bigS = SCALE() * 3;
-        drawSideCat(ctx, cx - 12 * bigS, cy - 6 * bigS, bigS, "black");
-      }
-    }
-
-    // caption
-    if (t < grow + hold) {
-      ctx.fillStyle = "rgba(20,20,20,0.78)";
-      ctx.font = "bold 20px ui-monospace, monospace";
-      ctx.textAlign = "center";
-      ctx.fillText("✊ 잡았다!", cx, cy + (CAT1_LOADED ? 110 : 90));
-    }
+    const x = (w - drawW) / 2;
+    const y = (h - drawH) / 2;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, x, y, drawW, drawH);
+    ctx.globalAlpha = 1;
   }
+
+  hint.textContent = "✋ 손을 펴 보고, 주먹을 쥐면 잡혀요";
 
   function loop(now) {
     const dt = Math.min(0.05, (now - state.last) / 1000);
     state.last = now;
 
-    if (state.reveal.active) {
-      state.reveal.t += dt;
-      drawReveal(now);
-      if (state.reveal.t > 2.1) {
-        state.reveal.active = false;
-        if (state.found < state.total) placeCat();
-        else { state.found = 0; setScore("blackScore", 0); placeCat(); }
-      }
-      state.raf = requestAnimationFrame(loop);
-      return;
+    // edge: just became a fist → trigger flash + kick
+    if (isFist && !state.wasFist) {
+      state.flash = 1;
+      state.kick = 1;
+      hint.textContent = "✊ 잡았다!";
+    } else if (!isFist && state.wasFist) {
+      hint.textContent = "✋ 손을 펴면 다시 보여요";
     }
+    state.wasFist = isFist;
 
-    drawDarkness();
+    // smooth animations
+    const target = isFist ? 1 : 0;
+    state.fistAmt += (target - state.fistAmt) * Math.min(1, dt * 8);
+    state.flash = Math.max(0, state.flash - dt * 2.2);
+    state.kick  = Math.max(0, state.kick - dt * 3);
 
-    state.nextBlink -= dt;
-    if (state.nextBlink <= 0) { state.blinkPhase = 1; state.nextBlink = 0.4 + Math.random() * 0.9; }
-    state.blinkPhase = Math.max(0, state.blinkPhase - dt * 4);
-    const blinking = state.blinkPhase > 0.5;
+    // black backdrop so transparent edges look intentional
+    ctx.fillStyle = "#06060a";
+    ctx.fillRect(0, 0, w, h);
 
-    // gentle eye drift — feels alive
-    state.cat.eyeOffset += state.cat.eyeDir * dt * 0.6;
-    if (Math.abs(state.cat.eyeOffset) > 1.4) state.cat.eyeDir *= -1;
+    // cross-fade between the two photos. tiny zoom-in on the "caught" image
+    // sells the grab moment without hiding the picture.
+    const baseScale = 1 + state.kick * 0.04;
+    drawCover(BLACK1_IMG, 1 - state.fistAmt, 1);
+    drawCover(BLACK2_IMG, state.fistAmt, baseScale);
 
-    if (now > state.moveAt) placeCat();
-
-    const s = SCALE();
-    const catCx = state.cat.x + 12 * s;
-    const catCy = state.cat.y + 6 * s;
-    let lit = 0;
-    if (handPos) {
-      const d = Math.hypot(handPos.x - catCx, handPos.y - catCy);
-      lit = Math.max(0, 1 - d / 160);
-    }
-
-    // start: ONLY eyes — body never appears until lit by flashlight
-    if (lit > 0.35) {
-      drawSideCat(ctx, state.cat.x, state.cat.y, s, "black", { blink: blinking });
-    } else {
-      // draw eyes with subtle drift offset for life
-      ctx.save();
-      ctx.translate(state.cat.eyeOffset, 0);
-      drawSideCat(ctx, state.cat.x, state.cat.y, s, "black", { onlyEyes: true, blink: blinking });
-      ctx.restore();
-    }
-
-    if (handPos) {
-      const radius = 170;
-      const grad = ctx.createRadialGradient(handPos.x, handPos.y, 8, handPos.x, handPos.y, radius);
-      grad.addColorStop(0,    "rgba(255,238,170,0.55)");
-      grad.addColorStop(0.45, "rgba(255,238,170,0.18)");
-      grad.addColorStop(1,    "rgba(255,238,170,0)");
-      ctx.fillStyle = grad;
+    if (state.flash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${state.flash * 0.35})`;
       ctx.fillRect(0, 0, w, h);
-
-      ctx.lineWidth = 2.2;
-      ctx.strokeStyle = isFist ? "#ffd84a" : "#fff";
-      ctx.fillStyle   = isFist ? "rgba(255,216,74,0.18)" : "rgba(255,255,255,0.08)";
-      ctx.beginPath();
-      ctx.arc(handPos.x, handPos.y, isFist ? 16 : 28, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.font = "11px ui-monospace, monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(isFist ? "✊ 잡기!" : "✋ 손전등", handPos.x, handPos.y + (isFist ? 30 : 44));
-    }
-
-    state.fistCooldown = Math.max(0, state.fistCooldown - dt);
-    if (handPos && isFist && lit > 0.5 && state.fistCooldown <= 0) {
-      const d = Math.hypot(handPos.x - catCx, handPos.y - catCy);
-      if (d < 70) {
-        state.found++;
-        state.fistCooldown = 0.8;
-        setScore("blackScore", (state.found / state.total) * 100);
-        hint.textContent = state.found >= state.total
-          ? "모두 잡았어요! 깜냥이 컴플리트 🐾"
-          : `잡았다! ${state.found}/${state.total}`;
-        // trigger flashlight reveal
-        state.reveal.active = true;
-        state.reveal.t = 0;
-        state.reveal.x = catCx;
-        state.reveal.y = catCy;
-      }
     }
 
     state.raf = requestAnimationFrame(loop);
