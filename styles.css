@@ -551,6 +551,10 @@ body.fullscreen-game .card .canvas-wrap {
   min-height: 0;
   background: #06060a;
 }
+body.fullscreen-game .card[data-card="cheese"],
+body.fullscreen-game .card[data-card="cheese"] .canvas-wrap {
+  background: #ffffff;
+}
 body.fullscreen-game .card .hint {
   position: absolute;
   left: 50%; bottom: 28px; top: auto;

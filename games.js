@@ -235,12 +235,8 @@ function startCheeseCatGame() {
   });
 
   function bgStripes() {
-    ctx.fillStyle = "#fff8e7";
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(244, 169, 59, 0.10)";
-    for (let i = -h; i < w + h; i += 28) {
-      ctx.fillRect(i, 0, 14, h);
-    }
   }
 
   function drawHand(p, color, label) {
@@ -287,7 +283,8 @@ function startCheeseCatGame() {
 
       const baseScale = Math.max(3, Math.min(w, h) / 80);
       const spriteW = 24 * baseScale;
-      const stretchX = Math.max(0.85, Math.min(4.5, dist / spriteW));
+      const maxStretch = Math.max(4.5, (w * 0.98) / spriteW);
+      const stretchX = Math.max(0.85, Math.min(maxStretch, dist / spriteW));
       const drawW = spriteW * stretchX;
       drawSideCat(ctx, cx - drawW / 2, cy - 6 * baseScale, baseScale, "cheese",
                   { stretchX, tilt: angle });
@@ -304,7 +301,6 @@ function startCheeseCatGame() {
       state.stability += (0.45 - off) * dt * 20;
 
       if (dist < 120) hint.textContent = "조금 더 벌려보세요";
-      else if (dist > w * 0.78) hint.textContent = "너무 늘렸어요!";
       else if (!state.free) hint.textContent = "좋아요. 손을 빠르게 모으면 튕겨요";
     } else if (state.free) {
       state.cat.vy += 850 * dt;
