@@ -116,6 +116,12 @@ const BLACK2_IMG = new Image();
 BLACK1_IMG.src = "public/black1.png";
 BLACK2_IMG.src = "public/black2.png";
 
+// Tuxedo cat photos — cat4 = base (messy), cat5 = tidy/groomed
+const CAT4_IMG = new Image();
+const CAT5_IMG = new Image();
+CAT4_IMG.src = "public/cat4.png";
+CAT5_IMG.src = "public/cat5.png";
+
 // ============================================================
 // 1. BLACK CAT — black1.png fills the screen; making a fist
 //    cross-fades to black2.png with a soft flash + zoom kick.
@@ -129,15 +135,13 @@ function startBlackCatGame() {
 
   const state = {
     cat: { x: 0, y: 0, tx: 0, ty: 0, retargetAt: 0 },
-    fistAmt: 0,            // 0 = black1, 1 = black2 (smoothly animated)
-    caught: false,         // locked into black2 once caught
-    caughtUntil: 0,        // auto-release time
+    catchAmt: 0,           // 0 = open, 1 = caught (locks on black2)
+    caught: false,
+    caughtUntil: 0,
     flash: 0,
     kick: 0,
-    blink: 0,              // 0 = open eyes, 1 = closed
+    blink: 0,              // brief swap to black2 to fake an eye-blink
     nextBlinkAt: 0,
-    eyeOffset: 0,          // small left/right glance
-    eyeDir: 1,
     raf: 0,
     last: performance.now(),
   };
@@ -171,7 +175,7 @@ function startBlackCatGame() {
   state.nextBlinkAt = performance.now() + 800 + Math.random() * 1600;
 
   function drawCatPhoto(img, cx, cy, alpha, scaleMul) {
-    if (!img.naturalWidth) return null;
+    if (!img.naturalWidth || alpha <= 0) return;
     const ar = img.naturalWidth / img.naturalHeight;
     // fit cat to ~52% of the smaller screen dimension
     const target = Math.min(w, h) * 0.52 * scaleMul;
@@ -183,29 +187,6 @@ function startBlackCatGame() {
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, x, y, drawW, drawH);
     ctx.globalAlpha = 1;
-    return { x, y, w: drawW, h: drawH };
-  }
-
-  function drawEyes(box) {
-    if (!box) return;
-    // approximate eye position on the cat photo (upper-center face area)
-    const eyeY = box.y + box.h * 0.34;
-    const eyeGap = box.w * 0.13;
-    const cxL = box.x + box.w * 0.5 - eyeGap + state.eyeOffset;
-    const cxR = box.x + box.w * 0.5 + eyeGap + state.eyeOffset;
-    const rx  = Math.max(3, box.w * 0.028);
-    const ry  = Math.max(2, box.h * 0.022) * (1 - state.blink);
-
-    // soft yellow glow
-    ctx.save();
-    ctx.fillStyle = "rgba(255, 230, 120, 0.85)";
-    ctx.shadowColor = "rgba(255, 220, 90, 0.9)";
-    ctx.shadowBlur = Math.max(6, box.w * 0.04);
-    if (ry > 0.4) {
-      ctx.beginPath(); ctx.ellipse(cxL, eyeY, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(cxR, eyeY, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
   }
 
   function drawHandCursor() {
@@ -252,14 +233,12 @@ function startBlackCatGame() {
       state.cat.y += dy * Math.min(1, dt * speed);
     }
 
-    // blink schedule
-    if (now > state.nextBlinkAt) {
+    // blink schedule — briefly cross-fade to black2 to fake an eye blink
+    if (!state.caught && now > state.nextBlinkAt) {
       state.blink = 1;
-      state.nextBlinkAt = now + 1100 + Math.random() * 2200;
+      state.nextBlinkAt = now + 2200 + Math.random() * 2600;
     }
-    state.blink = Math.max(0, state.blink - dt * 6); // close→open quickly
-    // small horizontal eye glance, sinusoidal
-    state.eyeOffset = Math.sin(now / 600) * Math.max(2, Math.min(w, h) * 0.004);
+    state.blink = Math.max(0, state.blink - dt * 5);
 
     // catch detection: fist while hand overlaps the cat
     if (!state.caught && isFist && handPos) {
@@ -269,6 +248,7 @@ function startBlackCatGame() {
         state.caughtUntil = now + 1800;
         state.flash = 1;
         state.kick = 1;
+        state.blink = 0;
         hint.textContent = "✊ 잡았다!";
       }
     }
@@ -278,9 +258,9 @@ function startBlackCatGame() {
       placeNow();
     }
 
-    // smooth photo cross-fade
-    const target = state.caught ? 1 : 0;
-    state.fistAmt += (target - state.fistAmt) * Math.min(1, dt * 9);
+    // smooth catch transition (locks on black2 while caught)
+    const targetCatch = state.caught ? 1 : 0;
+    state.catchAmt += (targetCatch - state.catchAmt) * Math.min(1, dt * 9);
     state.flash = Math.max(0, state.flash - dt * 2.2);
     state.kick  = Math.max(0, state.kick - dt * 3);
 
@@ -288,17 +268,12 @@ function startBlackCatGame() {
     ctx.fillStyle = "#06060a";
     ctx.fillRect(0, 0, w, h);
 
-    // draw active photo at the cat's current position
+    // composite: black1 always on, black2 alpha = max(catch, blink)
+    const blackTwoAmt = Math.max(state.catchAmt, state.blink);
     const kickScale = 1 + state.kick * 0.06;
-    const box = state.fistAmt < 0.5
-      ? drawCatPhoto(BLACK1_IMG, state.cat.x, state.cat.y, 1 - state.fistAmt, 1)
-      : drawCatPhoto(BLACK2_IMG, state.cat.x, state.cat.y, state.fistAmt, kickScale);
-    if (state.fistAmt > 0 && state.fistAmt < 1) {
-      drawCatPhoto(state.fistAmt < 0.5 ? BLACK2_IMG : BLACK1_IMG,
-                   state.cat.x, state.cat.y,
-                   state.fistAmt < 0.5 ? state.fistAmt : 1 - state.fistAmt, 1);
-    }
-    if (!state.caught) drawEyes(box);
+    drawCatPhoto(BLACK1_IMG, state.cat.x, state.cat.y, 1, 1);
+    drawCatPhoto(BLACK2_IMG, state.cat.x, state.cat.y, blackTwoAmt,
+                 1 + (kickScale - 1) * state.catchAmt);
 
     drawHandCursor();
 
@@ -559,9 +534,7 @@ function startTuxedoCatGame() {
     }
 
     const baseScale = Math.max(3, Math.min(w, h) / 70);
-    const headX = w / 2 - 7 * baseScale;
-    const headY = h / 2 - 12 * baseScale;
-    drawTuxedoFrontCat(ctx, headX, headY, baseScale);
+    drawTuxedoPhoto(ctx, w, h, state.grace);
 
     for (const p of state.pieces) {
       if (p !== grabbed) {
@@ -634,32 +607,25 @@ function startTuxedoCatGame() {
   };
 }
 
-function drawTuxedoFrontCat(ctx, x, y, s) {
-  const sprite = [
-    "00110000000110",
-    "01110000001110",
-    "01111000011110",
-    "01111111111110",
-    "11111111111111",
-    "11122111122111",
-    "11132111132111",
-    "11111155511111",
-    "11111111111111",
-    "01111111111110",
-    "01111111111110",
-    "01111111111110",
-    "00111111111100",
-    "00011111111000",
-  ];
-  const col = { 1: "#0e0e0e", 2: "#a3d24f", 3: "#0c1503", 5: "#e58aa8" };
-  for (let r = 0; r < sprite.length; r++) {
-    for (let c = 0; c < sprite[r].length; c++) {
-      const ch = sprite[r][c];
-      if (ch === "0") continue;
-      ctx.fillStyle = col[ch] || "#000";
-      ctx.fillRect(Math.round(x + c * s), Math.round(y + r * s), Math.ceil(s), Math.ceil(s));
-    }
+function drawTuxedoPhoto(ctx, w, h, grace) {
+  // grace 0..100 → blend cat4 (messy) → cat5 (tidy)
+  const t = Math.max(0, Math.min(1, grace / 100));
+  function drawFit(img, alpha) {
+    if (!img.naturalWidth || alpha <= 0) return;
+    const ar = img.naturalWidth / img.naturalHeight;
+    // contain — show the whole cat, ~70% of the smaller dimension
+    const target = Math.min(w, h) * 0.7;
+    let dw, dh;
+    if (ar >= 1) { dw = target; dh = target / ar; }
+    else         { dh = target; dw = target * ar; }
+    const x = (w - dw) / 2;
+    const y = (h - dh) / 2;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, x, y, dw, dh);
+    ctx.globalAlpha = 1;
   }
+  drawFit(CAT4_IMG, 1 - t);
+  drawFit(CAT5_IMG, t);
 }
 
 // ============================================================
