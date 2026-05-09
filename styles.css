@@ -20,10 +20,234 @@ html, body {
 
 img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 
+/* ============================================================
+   HOME SCREEN — Meowdows XP style
+============================================================ */
+.home {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #4ea7d6 0%, #6ec0e0 60%, #6ec0e0 65%, #6ec0e0 65%);
+  overflow: hidden;
+  display: none;
+  font-family: "Courier New", "Press Start 2P", monospace;
+}
+body.home-mode .home { display: block; }
+body.home-mode .topbar,
+body.home-mode .cat-nav,
+body.home-mode .stage,
+body.home-mode .footbar { display: none; }
+
+.home-sky {
+  position: absolute;
+  inset: 0 0 38% 0;
+  pointer-events: none;
+}
+.cloud {
+  position: absolute;
+  width: 110px; height: 22px;
+  background:
+    linear-gradient(#f5f1d8, #f5f1d8) 0 0/100% 100% no-repeat;
+  box-shadow:
+    14px -8px 0 0 #fffbe6,
+    32px -14px 0 0 #fffbe6,
+    52px -8px 0 0 #fffbe6,
+    72px -2px 0 0 #fffbe6;
+  border-radius: 2px;
+  image-rendering: pixelated;
+  opacity: 0.95;
+}
+.cloud-a { top: 14%; right: 18%; transform: scale(1.2); }
+.cloud-b { top: 28%; left: 8%;  transform: scale(0.85); opacity: 0.7; }
+
+.home-grass {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 38%;
+  background:
+    linear-gradient(#79b34a 0%, #79b34a 18%, #6aa340 18%, #6aa340 38%, #5e9637 38%, #5e9637 100%);
+}
+.home-grass::before {
+  content: "";
+  position: absolute;
+  top: -14px; left: 0; right: 0;
+  height: 18px;
+  background:
+    radial-gradient(circle at 14px 18px, #79b34a 12px, transparent 13px) repeat-x;
+  background-size: 28px 18px;
+}
+
+.home-logo {
+  position: absolute;
+  top: 14%; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 2;
+}
+.home-logo-img-wrap {
+  /* logo.png is 2516x2244; bottom ~22% is a static loading bar baked into the
+     image — crop it so the animated .loading-bar below replaces it */
+  width: clamp(260px, 42vw, 460px);
+  aspect-ratio: 2516 / 1750;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.home-logo-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.loading-bar {
+  position: relative;
+  margin-top: 10px;
+  width: 130px;
+  height: 16px;
+  background: #050505;
+  border: 2px solid #d8d8d8;
+  border-radius: 2px;
+  overflow: hidden;
+  padding: 0;
+  box-shadow: inset 0 0 0 1px #000;
+}
+.loading-bar span {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 11px;
+  height: calc(100% - 4px);
+  background: linear-gradient(180deg, #6aa6ff 0%, #2a6bd9 50%, #1948a8 100%);
+  border: 1px solid #1f3a78;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: load-slide 1.6s linear infinite;
+}
+.loading-bar span:nth-child(2) { animation-delay: 0.18s; }
+.loading-bar span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes load-slide {
+  0%   { transform: translateX(-14px); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(130px); opacity: 0; }
+}
+
+.home-files {
+  position: absolute;
+  bottom: 6%; left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(28px, 6vw, 80px);
+  padding: 0 24px;
+  z-index: 3;
+}
+.file-btn {
+  position: relative;
+  width: clamp(110px, 12vw, 160px);
+  height: clamp(120px, 14vw, 170px);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  outline: none;
+}
+.file-btn:focus-visible .file-box { outline: 2px dashed #fff; outline-offset: 4px; }
+
+.file-cat {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translate(-50%, 38%);
+  width: 84px; height: 120px;
+  z-index: 1;
+  image-rendering: pixelated;
+  transition: transform 0.32s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.file-box {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 56%;
+  background: #f7c84f;
+  border: 3px solid #b87f1a;
+  border-bottom-width: 4px;
+  box-shadow: inset 0 -8px 0 0 #d99a2a, 0 4px 0 0 #8a5a10;
+  z-index: 2;
+}
+.file-tab {
+  position: absolute;
+  top: -10px; left: 16px;
+  width: 38%;
+  height: 12px;
+  background: #f7c84f;
+  border: 3px solid #b87f1a;
+  border-bottom: 0;
+  border-radius: 2px 6px 0 0;
+  z-index: 2;
+}
+.file-tip {
+  position: absolute;
+  bottom: -22px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 3px 8px;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+}
+
+.file-btn:hover .file-cat,
+.file-btn:focus-visible .file-cat {
+  transform: translate(-50%, -38%);
+}
+.file-btn:hover .file-tip,
+.file-btn:focus-visible .file-tip { opacity: 1; }
+.file-btn:hover .file-box {
+  transform: translateY(2px);
+  transition: transform 0.15s ease;
+}
+.file-btn:active .file-cat { transform: translate(-50%, -32%) scale(0.96); }
+
+.home-btn {
+  position: absolute;
+  top: 16px; left: 16px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--line);
+  border-radius: 999px;
+}
+.home-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--line); }
+.home-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--line); }
+
+@media (max-width: 760px) {
+  .home-files { gap: 20px; bottom: 4%; }
+  .file-btn { width: 26vw; height: 30vw; }
+  .file-cat { width: 70%; height: 90%; }
+  .logo-main { font-size: 20px; }
+}
+
 .topbar {
   display: flex; flex-direction: column; align-items: center;
   padding: 28px 16px 14px;
   border-bottom: 1.5px dashed #d6cfbf;
+  position: relative;
 }
 .logo {
   font-family: "Courier New", monospace;
@@ -167,8 +391,170 @@ img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
   border-top: 1.5px dashed #d6cfbf;
 }
 
+.card[data-card="calico"] .canvas-wrap { background: #fff5e6; }
+
 @media (max-width: 760px) {
   .card { grid-template-columns: 1fr; box-shadow: 4px 4px 0 var(--line); }
   .canvas-wrap { aspect-ratio: 1 / 1; min-height: 320px; }
   .nav-btn { font-size: 12px; padding: 7px 12px; }
+}
+
+/* ============================================================
+   CAMERA — preview + permission overlay
+============================================================ */
+.cam-preview {
+  position: fixed;
+  top: 18px; right: 18px;
+  width: 160px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #000;
+  border: 1.5px solid var(--line);
+  box-shadow: 4px 4px 0 var(--line);
+  transform: scaleX(-1);
+  z-index: 80;
+  display: none;
+  border-radius: 4px;
+}
+body.cam-active:not(.home-mode) .cam-preview { display: block; }
+
+.cam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 12, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+.cam-overlay[hidden] { display: none; }
+
+.cam-modal {
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  box-shadow: 8px 8px 0 var(--line);
+  padding: 28px 28px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  font-family: ui-sans-serif, system-ui, "Apple SD Gothic Neo", sans-serif;
+}
+.cam-modal .cam-icon { font-size: 38px; margin-bottom: 8px; }
+.cam-modal h3 { font-size: 18px; margin-bottom: 10px; letter-spacing: -0.01em; }
+.cam-modal p { font-size: 13px; color: #4a4338; line-height: 1.55; margin-bottom: 18px; }
+.cam-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.cam-modal button {
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  border: 1.5px solid var(--line);
+  padding: 10px 18px;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--line);
+  background: var(--paper);
+}
+.cam-modal button.primary { background: var(--ink); color: #fff; }
+.cam-modal button:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--line); }
+.cam-modal button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--line); }
+.cam-error { margin-top: 14px; color: #c0392b; font-size: 12px; }
+
+/* Calico file in home — three-color band */
+.file-btn[data-cat="calico"] .file-box {
+  background:
+    linear-gradient(90deg,
+      #f7c84f 0%, #f7c84f 55%,
+      #2a2a2a 55%, #2a2a2a 78%,
+      #fafafa 78%, #fafafa 100%);
+}
+
+/* Optional photo asset for the home tile (cat1.png) */
+.file-photo {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translate(-50%, 38%);
+  width: 110%;
+  height: 130%;
+  object-fit: contain;
+  z-index: 1;
+  image-rendering: pixelated;
+  transition: transform 0.32s cubic-bezier(.34, 1.56, .64, 1);
+  pointer-events: none;
+  display: none; /* shown only when the photo actually loads */
+}
+.file-btn.has-photo .file-cat { display: none; }
+.file-btn.has-photo .file-photo { display: block; }
+.file-btn.has-photo:hover .file-photo,
+.file-btn.has-photo:focus-visible .file-photo {
+  transform: translate(-50%, -38%);
+}
+
+/* ============================================================
+   FULLSCREEN GAME — used by black-cat game
+============================================================ */
+.fs-back {
+  position: fixed;
+  top: 22px; left: 22px;
+  z-index: 110;
+  background: rgba(20, 20, 28, 0.55);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.45);
+  font-family: ui-monospace, "JetBrains Mono", monospace;
+  padding: 10px 18px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  border-radius: 999px;
+  display: none;
+  backdrop-filter: blur(6px);
+}
+body.fullscreen-game .fs-back { display: inline-flex; align-items: center; gap: 6px; }
+.fs-back:hover  { background: rgba(40, 40, 52, 0.75); transform: translate(-1px,-1px); }
+.fs-back:active { transform: translate(1px,1px); }
+
+body.fullscreen-game .topbar,
+body.fullscreen-game .cat-nav,
+body.fullscreen-game .footbar { display: none; }
+
+body.fullscreen-game .stage {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+body.fullscreen-game .card {
+  position: fixed;
+  inset: 0;
+  display: block;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  background: #06060a;
+  animation: none;
+  z-index: 50;
+}
+body.fullscreen-game .card .card-info { display: none; }
+body.fullscreen-game .card .canvas-wrap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  aspect-ratio: auto;
+  min-height: 0;
+  background: #06060a;
+}
+body.fullscreen-game .card .hint {
+  position: absolute;
+  left: 50%; bottom: 28px; top: auto;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  padding: 8px 14px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
 }

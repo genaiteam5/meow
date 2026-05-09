@@ -3,13 +3,56 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>고양이 인터랙티브 도감</title>
+<title>고양이 인터랙티브 도감 · 핸드트래킹</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="home-mode">
+  <section class="home" id="home">
+    <div class="home-sky">
+      <div class="cloud cloud-a"></div>
+      <div class="cloud cloud-b"></div>
+    </div>
+
+    <div class="home-logo">
+      <div class="home-logo-img-wrap">
+        <img class="home-logo-img" src="public/logo.png" alt="Meowsoft Meowdows XP" />
+      </div>
+      <div class="loading-bar">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div class="home-grass"></div>
+
+    <div class="home-files">
+      <button class="file-btn" data-cat="black" type="button" aria-label="검은 고양이 게임 시작">
+        <img class="file-photo" src="public/cat1.png" alt="" />
+        <canvas class="file-cat" data-palette="black" width="84" height="120"></canvas>
+        <div class="file-box"><div class="file-tab"></div></div>
+        <span class="file-tip">깜냥이 · 손전등</span>
+      </button>
+      <button class="file-btn" data-cat="cheese" type="button" aria-label="치즈 고양이 게임 시작">
+        <canvas class="file-cat" data-palette="cheese" width="84" height="120"></canvas>
+        <div class="file-box"><div class="file-tab"></div></div>
+        <span class="file-tip">치즈 · 양손 늘이기</span>
+      </button>
+      <button class="file-btn" data-cat="tuxedo" type="button" aria-label="턱시도 고양이 게임 시작">
+        <canvas class="file-cat" data-palette="tuxedo" width="84" height="120"></canvas>
+        <div class="file-box"><div class="file-tab"></div></div>
+        <span class="file-tip">턱시도 · 핀치</span>
+      </button>
+      <button class="file-btn" data-cat="calico" type="button" aria-label="삼색이 게임 시작">
+        <canvas class="file-cat" data-palette="calico" width="84" height="120"></canvas>
+        <div class="file-box"><div class="file-tab"></div></div>
+        <span class="file-tip">삼색이 · 쓰다듬기</span>
+      </button>
+    </div>
+  </section>
+
   <header class="topbar">
+    <button class="home-btn" id="homeBtn" type="button" aria-label="홈으로">◀ HOME</button>
     <h1 class="logo">CAT-O-PEDIA<span class="dot">.</span></h1>
-    <p class="subtitle">털 색깔로 만나는 인터랙티브 고양이 도감</p>
+    <p class="subtitle">손동작으로 만나는 인터랙티브 고양이 도감</p>
   </header>
 
   <nav class="cat-nav" id="catNav">
@@ -25,21 +68,25 @@
       <span class="nav-swatch" style="background:linear-gradient(180deg,#111 50%,#f4f1e8 50%)"></span>
       <span class="nav-label">턱시도 고양이</span>
     </button>
+    <button class="nav-btn" data-cat="calico">
+      <span class="nav-swatch" style="background:conic-gradient(#fff 0 33%, #f4a93b 33% 66%, #111 66% 100%)"></span>
+      <span class="nav-label">삼색이</span>
+    </button>
   </nav>
 
   <main class="stage">
     <section class="card" data-card="black">
       <div class="card-info">
         <span class="tag">no.01 — 깜냥이</span>
-        <h2>어둠 속의 눈동자</h2>
+        <h2>어둠 속의 손전등</h2>
         <p class="metaphor">디자인 메타포 · 보호색과 은폐</p>
-        <p class="experience">핵심 게임 경험 · 어둠 속에서 사라지는 고양이를 찾는 관찰력 게임</p>
-        <p class="howto">화면이 어두워지면 고양이가 사라져요. 깜빡이는 노란 눈동자와 작은 울음을 단서로 위치를 찾아 클릭해 보세요.</p>
-        <div class="meter"><span>발견</span><div class="bar"><i id="blackScore"></i></div></div>
+        <p class="experience">핵심 게임 경험 · 손이 손전등이 되어 어둠 속 고양이를 비추고 주먹으로 잡기</p>
+        <p class="howto">손바닥을 카메라에 보여주면 빛이 켜져요. 어둠 속 깜빡이는 노란 눈을 찾아 비추고, 주먹을 꼭 쥐어 깜냥이를 잡아주세요.</p>
+        <div class="meter"><span>포획</span><div class="bar"><i id="blackScore"></i></div></div>
       </div>
       <div class="canvas-wrap">
         <canvas id="blackCanvas"></canvas>
-        <div class="hint" id="blackHint">화면을 클릭해 고양이를 깨워요</div>
+        <div class="hint" id="blackHint">손바닥을 펴서 어둠을 비춰요</div>
       </div>
     </section>
 
@@ -47,37 +94,71 @@
       <div class="card-info">
         <span class="tag">no.02 — 치즈</span>
         <h2>쭉쭉 늘어나는 치즈</h2>
-        <p class="metaphor">디자인 메타포 · 유연성과 에너지</p>
-        <p class="experience">핵심 게임 경험 · 고무줄처럼 늘어나는 몸을 제어하는 반사 신경 게임</p>
-        <p class="howto">치즈가 마음대로 늘어나려고 해요. 고양이를 잡고 끌어당겼다가 놓으면 통통 튕겨 돌아옵니다. 너무 멀리 가지 않게 막아주세요.</p>
-        <div class="meter"><span>안정</span><div class="bar"><i id="cheeseScore"></i></div></div>
+        <p class="metaphor">디자인 메타포 · 유연성과 탄성</p>
+        <p class="experience">핵심 게임 경험 · 양손 간격으로 고양이 몸을 늘이고, 손을 모아 탄성 있게 튕기기</p>
+        <p class="howto">양손을 펼쳐 카메라에 보여주세요. 손 사이 거리에 맞춰 치즈가 쭉쭉 늘어나요. 손을 빠르게 모으면 탄성으로 튕깁니다.</p>
+        <div class="meter"><span>탄성</span><div class="bar"><i id="cheeseScore"></i></div></div>
       </div>
       <div class="canvas-wrap">
         <canvas id="cheeseCanvas"></canvas>
-        <div class="hint" id="cheeseHint">고양이를 드래그해서 튕겨 보내요</div>
+        <div class="hint" id="cheeseHint">양손을 카메라에 보여주세요</div>
       </div>
     </section>
 
     <section class="card hidden" data-card="tuxedo">
       <div class="card-info">
         <span class="tag">no.03 — 턱시도</span>
-        <h2>신사의 품격 유지하기</h2>
-        <p class="metaphor">디자인 메타포 · 의인화와 정돈</p>
-        <p class="experience">핵심 게임 경험 · 흐트러지는 품격을 유지하는 정교한 조작 게임</p>
-        <p class="howto">우다다가 시작되면 셔츠와 타이가 흐트러져요. 빠르게 스와이프해서 매무새를 다시 단정하게 정리해 주세요.</p>
+        <h2>흐트러진 셔츠 단정히</h2>
+        <p class="metaphor">디자인 메타포 · 정돈과 품격</p>
+        <p class="experience">핵심 게임 경험 · 엄지와 검지로 핀치하여 흐트러진 흰 털 조각을 모으기</p>
+        <p class="howto">엄지와 검지를 살짝 모아 핀치 동작을 해주세요. 흩어지는 흰 털 조각을 집어 가슴 중앙으로 가져다 놓으면 단정해집니다.</p>
         <div class="meter"><span>품격</span><div class="bar"><i id="tuxedoScore"></i></div></div>
       </div>
       <div class="canvas-wrap">
         <canvas id="tuxedoCanvas"></canvas>
-        <div class="hint" id="tuxedoHint">흐트러진 부분을 스와이프해 정리해요</div>
+        <div class="hint" id="tuxedoHint">엄지·검지를 모아 핀치하세요</div>
+      </div>
+    </section>
+
+    <section class="card hidden" data-card="calico">
+      <div class="card-info">
+        <span class="tag">no.04 — 삼색이</span>
+        <h2>분신술의 비밀</h2>
+        <p class="metaphor">디자인 메타포 · 행복의 폭발</p>
+        <p class="experience">핵심 게임 경험 · 손바닥으로 쓰다듬어 행복 한계치에 도달하면 흰·주황·검정 분신술 발동</p>
+        <p class="howto">손바닥을 펴서 고양이 위를 부드럽게 쓸어주세요. 행복이 가득 차면 펑! 하고 세 마리로 나뉩니다.</p>
+        <div class="meter"><span>행복</span><div class="bar"><i id="calicoScore"></i></div></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="calicoCanvas"></canvas>
+        <div class="hint" id="calicoHint">손바닥을 흔들어 쓰다듬어 보세요</div>
       </div>
     </section>
   </main>
 
   <footer class="footbar">
-    <span>pixel · interactive · vanilla canvas</span>
+    <span>pixel · hand-tracking · MediaPipe Hands</span>
   </footer>
 
+  <button class="fs-back" id="fsBack" type="button" aria-label="홈으로">◀ 홈</button>
+
+  <video id="camPreview" class="cam-preview" autoplay muted playsinline></video>
+
+  <div id="camOverlay" class="cam-overlay" hidden>
+    <div class="cam-modal">
+      <div class="cam-icon">📷</div>
+      <h3>카메라 권한이 필요해요</h3>
+      <p id="camMessage">손동작으로 고양이와 놀 수 있는 게임이에요.<br/>카메라는 손 위치만 인식하고 저장하지 않아요.</p>
+      <div class="cam-actions">
+        <button id="camStartBtn" type="button" class="primary">카메라 켜기</button>
+        <button id="camCancelBtn" type="button" class="ghost">나중에</button>
+      </div>
+      <p id="camError" class="cam-error" hidden></p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+  <script src="hand-tracker.js"></script>
   <script src="games.js"></script>
   <script src="main.js"></script>
 </body>
