@@ -114,9 +114,37 @@ function setScore(barId, pct) {
 const BLACK2_IMG = new Image();
 BLACK2_IMG.src = "public/black2.png";
 
-// Tuxedo cat photos — cat4 = base (messy), cat5 = tidy/groomed
+// Tuxedo cat photos — cat4 = base (messy), cat5 = tidy/groomed.
+// White background of the source PNGs is chroma-keyed to transparent
+// once the image loads, so only the cat silhouette renders.
 const CAT4_IMG = new Image();
 const CAT5_IMG = new Image();
+let CAT4_ALPHA = null, CAT5_ALPHA = null;
+function chromaKeyWhite(img) {
+  if (!img.naturalWidth) return null;
+  const c = document.createElement("canvas");
+  c.width  = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const cx = c.getContext("2d");
+  cx.drawImage(img, 0, 0);
+  let data;
+  try { data = cx.getImageData(0, 0, c.width, c.height); }
+  catch (e) { return null; }   // CORS — fall back to original image
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    // near-white → transparent. soft edge for anti-aliased pixels.
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const minC = Math.min(r, g, b);
+    if (minC > 230) {
+      const t = (minC - 230) / 25;
+      d[i + 3] = Math.round(d[i + 3] * (1 - Math.min(1, t)));
+    }
+  }
+  cx.putImageData(data, 0, 0);
+  return c;
+}
+CAT4_IMG.addEventListener("load", () => { CAT4_ALPHA = chromaKeyWhite(CAT4_IMG); });
+CAT5_IMG.addEventListener("load", () => { CAT5_ALPHA = chromaKeyWhite(CAT5_IMG); });
 CAT4_IMG.src = "public/cat4.png";
 CAT5_IMG.src = "public/cat5.png";
 
@@ -738,23 +766,25 @@ function drawPixelGrassBg(ctx, w, h) {
 function drawTuxedoPhoto(ctx, w, h, grace) {
   // grace 0..100 → blend cat4 (messy) → cat5 (tidy)
   const t = Math.max(0, Math.min(1, grace / 100));
-  function drawFit(img, alpha) {
-    if (!img.naturalWidth || alpha <= 0) return;
-    const ar = img.naturalWidth / img.naturalHeight;
-    // contain — show the whole cat, ~70% of the smaller dimension
+  function drawFit(src, alpha) {
+    if (!src || alpha <= 0) return;
+    const iw = src.width || src.naturalWidth;
+    const ih = src.height || src.naturalHeight;
+    if (!iw || !ih) return;
+    const ar = iw / ih;
     const target = Math.min(w, h) * 0.7;
     let dw, dh;
     if (ar >= 1) { dw = target; dh = target / ar; }
     else         { dh = target; dw = target * ar; }
-    // sit on the grass: center horizontally, center vertically at h*0.55
     const x = (w - dw) / 2;
     const y = h * 0.55 - dh / 2;
     ctx.globalAlpha = alpha;
-    ctx.drawImage(img, x, y, dw, dh);
+    ctx.drawImage(src, x, y, dw, dh);
     ctx.globalAlpha = 1;
   }
-  drawFit(CAT4_IMG, 1 - t);
-  drawFit(CAT5_IMG, t);
+  // prefer chroma-keyed canvases so the white photo background is gone
+  drawFit(CAT4_ALPHA || CAT4_IMG, 1 - t);
+  drawFit(CAT5_ALPHA || CAT5_IMG, t);
 }
 
 // ============================================================
